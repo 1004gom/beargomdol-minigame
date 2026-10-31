@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>곰돌이 미니게임</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#fff0f7;font-family:system-ui,"Noto Sans KR",sans-serif;color:#65394d}
+.stage{position:relative;width:min(100%,1536px);margin:0 auto;line-height:0}
+.stage>img{display:block;width:100%;height:auto}
+.hotspot{position:absolute;display:block;border:0;background:transparent;border-radius:18px;cursor:pointer;line-height:normal}
+.hotspot:focus-visible{outline:4px solid #6b5bd6;background:#ffffff22}
+.bubble{left:35.8%;top:53.2%;width:30%;height:6.5%}
+.fruit{left:74.5%;top:53.2%;width:24.5%;height:6.5%}
+.tetris{left:35.8%;top:86.3%;width:30%;height:6.5%}
+.tycoon{left:74.5%;top:86.3%;width:24.5%;height:6.5%}
+.rank{left:39%;top:19.3%;width:19%;height:6%}
+.myname{left:2%;top:80%;width:31%;height:13%}
+.hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:#fff;border:2px solid #ff9bc4;border-radius:99px;padding:8px 14px;font-size:13px;line-height:1.3;box-shadow:0 3px 12px #b55b8744;z-index:4}
+.modal{display:none;position:fixed;inset:0;background:#44233dcc;z-index:10;align-items:center;justify-content:center;padding:14px;line-height:normal}
+.modal.open{display:flex}.box{width:min(560px,100%);max-height:94vh;overflow:auto;background:linear-gradient(#fff8fc,#fff);border:4px solid #ffadd0;border-radius:25px;padding:16px;box-shadow:0 8px 0 #d75d96}
+.box-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.box h2{margin:0;color:#e64f92;font-size:25px}.close{background:#ffe1ed;border:0;border-radius:50%;width:38px;height:38px;font-size:22px;cursor:pointer;color:#9b3d68}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.pill{background:#fff0bd;border:1px solid #ffdc78;padding:7px 11px;border-radius:99px;font-weight:800}
+#play{min-height:190px;border-radius:16px;background:linear-gradient(#d5f3ff,#fff0f7);padding:12px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;position:relative}
+.bubble-ball{width:42px;height:42px;border:3px solid white;border-radius:50%;box-shadow:inset -4px -5px #0001,0 2px 3px #0002;cursor:pointer}
+.fruit-btn{font-size:34px;border:0;border-radius:12px;background:#fff;padding:5px;cursor:pointer}
+.game-btn{background:linear-gradient(#ff80b3,#f34f95);color:white;border:2px solid white;border-radius:99px;padding:10px 18px;font-weight:900;box-shadow:0 3px 0 #d94786;cursor:pointer}
+.actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+#tetris{display:grid;grid-template-columns:repeat(10, min(7vw,28px));gap:2px;background:#28294c;padding:5px;border-radius:8px}
+.tcell{width:min(7vw,28px);aspect-ratio:1;border:0;border-radius:3px;background:#47486d;padding:0}
+.tcell.filled{background:#ff65a7;box-shadow:inset -3px -3px #d83f84}
+.controls{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.controls button{min-width:48px;padding:9px;border:0;border-radius:10px;background:#e8e4ff;color:#5144a4;font-weight:900}
+input{font:inherit;padding:9px;border:2px solid #ffc0da;border-radius:10px;max-width:100%}
+.small{font-size:12px;line-height:1.5;color:#91687b;margin:10px 0 0}
+@media(max-width:560px){.hint{font-size:11px;max-width:92%;white-space:nowrap}.box h2{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+<img src="design-screen.jpeg" alt="곰돌이 미니게임 디자인">
+<button class="hotspot bubble" aria-label="버블 슈팅 시작" onclick="startBubble()"></button>
+<button class="hotspot fruit" aria-label="과일 자르기 시작" onclick="startFruit()"></button>
+<button class="hotspot tetris" aria-label="테트리스 시작" onclick="startTetris()"></button>
+<button class="hotspot tycoon" aria-label="타이쿤 시작" onclick="startTycoon()"></button>
+<button class="hotspot rank" aria-label="랭킹 안내" onclick="showRanking()"></button>
+<button class="hotspot myname" aria-label="내 아이디 기록" onclick="editName()"></button>
+</div>
+<div class="hint">게임 시작 버튼을 누르면 실제 게임이 열려요 🎮</div>
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+ <div class="box">
+  <div class="box-head"><h2 id="title">곰돌이 미니게임</h2><button class="close" onclick="closeGame()" aria-label="닫기">×</button></div>
+  <div class="stats"><span class="pill">점수: <b id="score">0</b></span><span class="pill" id="status">준비 완료</span></div>
+  <div id="play">게임을 준비하고 있어요!</div>
+  <div class="controls" id="controls"></div>
+  <div class="actions"><button class="game-btn" onclick="restartGame()">다시 시작 ↻</button><button class="game-btn" onclick="closeGame()">게임 닫기</button></div>
+  <p class="small" id="description"></p>
+ </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let game='',score=0,interval=null,timeout=null,seconds=0,tycoon={cash:0,level:1},tetris={grid:[],piece:null,x:3,y:0,over:false};
+let saved={};try{saved=JSON.parse(localStorage.getItem('gomdori_exact_scores')||'{}')}catch(e){}
+function save(){try{localStorage.setItem('gomdori_exact_scores',JSON.stringify(saved))}catch(e){}}
+function setScore(v){score=v;$('score').textContent=v.toLocaleString()}
+function open(title,desc){clearInterval(interval);clearTimeout(timeout);$('modal').classList.add('open');$('title').textContent=title;$('description').textContent=desc;$('play').innerHTML='';$('controls').innerHTML='';setScore(0);$('status').textContent='플레이 중';}
+function closeGame(){clearInterval(interval);clearTimeout(timeout);$('modal').classList.remove('open')}
+function finish(){clearInterval(interval);clearTimeout(timeout);$('status').textContent='종료 · '+score.toLocaleString()+'점';let old=saved[game]||0;if(score>old)saved[game]=score;save();$('description').textContent+=' 개인 최고 기록: '+(saved[game]||0).toLocaleString()+'점. (이 기기에 저장됩니다.)'}
+function timer(sec){seconds=sec;$('status').textContent='남은 시간: '+seconds+'초';interval=setInterval(()=>{seconds--;$('status').textContent='남은 시간: '+seconds+'초';if(seconds<=0)finish()},1000)}
+function restartGame(){if(game==='bubble')startBubble();else if(game==='fruit')startFruit();else if(game==='tetris')startTetris();else if(game==='tycoon')startTycoon()}
+function startBubble(){game='bubble';open('🫧 버블 슈팅','버블을 눌러 터뜨리세요. 30초 동안 점수를 모으세요!');let colors=['#50bfff','#ff6387','#ffd04e','#65d88b','#ae8bff'];let board=$('play');function refill(){for(let i=0;i<25;i++){let b=document.createElement('button');b.className='bubble-ball';b.style.background=colors[Math.floor(Math.random()*colors.length)];b.onclick=()=>{if(!b.isConnected)return;b.remove();setScore(score+100);if(board.children.length<8)refill()};board.append(b)}}refill();timer(30)}
+function startFruit(){game='fruit';open('🍉 과일 자르기','날아오는 과일을 눌러 자르세요! 30초 동안 콤보 점수를 얻으세요.');let board=$('play'),fruits=['🍉','🍊','🍓','🍍','🍇','🍎','🍐','🍒'];function spawn(){if(!$('modal').classList.contains('open')||game!=='fruit')return;let f=document.createElement('button');f.className='fruit-btn';f.textContent=fruits[Math.floor(Math.random()*fruits.length)];f.onclick=()=>{if(!f.isConnected)return;f.remove();setScore(score+100);spawn()};board.append(f);while(board.children.length>14)board.firstChild.remove()}for(let i=0;i<8;i++)spawn();timer(30);let old=interval;/* countdown and spawn share one timer */clearInterval(interval);seconds=30;interval=setInterval(()=>{seconds--;$('status').textContent='남은 시간: '+seconds+'초';if(seconds%2===0)spawn();if(seconds<=0)finish()},1000)}
+const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
+function startTetris(){game='tetris';open('🧩 테트리스','키보드 ← → ↓ 또는 아래 버튼으로 블록을 움직이세요. 줄이 가득 차면 지워집니다.');tetris={grid:Array.from({length:16},()=>Array(10).fill(0)),piece:null,x:3,y:0,over:false};$('play').style.display='block';$('play').innerHTML='<div id="tetris"></div>';let ctr=$('controls');[['◀',()=>move(-1,0)],['▼',()=>move(0,1)],['▶',()=>move(1,0)],['⟳',rotate]].forEach(([txt,fn])=>{let b=document.createElement('button');b.textContent=txt;b.onclick=fn;ctr.append(b)});newPiece();drawTetris();document.onkeydown=e=>{if(!$('modal').classList.contains('open')||game!=='tetris')return;if(e.key==='ArrowLeft')move(-1,0);if(e.key==='ArrowRight')move(1,0);if(e.key==='ArrowDown')move(0,1);if(e.key==='ArrowUp')rotate()};interval=setInterval(tick,650)}
+function newPiece(){tetris.piece=SHAPES[Math.floor(Math.random()*SHAPES.length)].map(r=>r.slice());tetris.x=3;tetris.y=0;if(collide(0,0)){tetris.over=true;finish()}}
+function collide(dx,dy,shape=tetris.piece){for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++)if(shape[y][x]){let xx=tetris.x+x+dx,yy=tetris.y+y+dy;if(xx<0||xx>=10||yy>=16||(yy>=0&&tetris.grid[yy][xx]))return true}return false}
+function move(dx,dy){if(game!=='tetris'||tetris.over)return;if(!collide(dx,dy)){tetris.x+=dx;tetris.y+=dy;drawTetris()}else if(dy===1)lockPiece()}
+function rotate(){if(game!=='tetris'||tetris.over)return;let s=tetris.piece[0].map((_,i)=>tetris.piece.map(r=>r[i]).reverse());if(!collide(0,0,s))tetris.piece=s;drawTetris()}
+function lockPiece(){tetris.piece.forEach((r,y)=>r.forEach((v,x)=>{if(v&&tetris.y+y>=0)tetris.grid[tetris.y+y][tetris.x+x]=1}));let cleared=0;tetris.grid=tetris.grid.filter(r=>{if(r.every(Boolean)){cleared++;return false}return true});while(tetris.grid.length<16)tetris.grid.unshift(Array(10).fill(0));if(cleared)setScore(score+cleared*100);newPiece();drawTetris()}
+function drawTetris(){let el=$('tetris');if(!el)return;el.innerHTML='';let g=tetris.grid.map(r=>r.slice());if(tetris.piece) tetris.piece.forEach((r,y)=>r.forEach((v,x)=>{let yy=tetris.y+y,xx=tetris.x+x;if(v&&yy>=0&&yy<16&&xx>=0&&xx<10)g[yy][xx]=2}));g.flat().forEach(v=>{let c=document.createElement('div');c.className='tcell'+(v?' filled':'');if(v===2)c.style.background='#ffc83f';el.append(c)})}
+function tick(){if(game!=='tetris'||tetris.over)return;move(0,1)}
+function startTycoon(){game='tycoon';open('🏪 곰돌이 타이쿤','상품을 팔아 돈을 모으고 가게를 업그레이드하세요. 점수는 수익과 레벨로 올라갑니다.');tycoon={cash:0,level:1};renderTycoon()}
+function renderTycoon(){$('play').innerHTML=`<div style="text-align:center;width:100%"><div style="font-size:70px">🏪 🧸 🪙</div><h3>곰돌이 상점</h3><p>보유 코인: <b id="cash">${tycoon.cash}</b>　가게 레벨: <b id="level">${tycoon.level}</b></p><p>손님이 기다리고 있어요!</p><button class="game-btn" id="sell">🍓 상품 판매 +10</button> <button class="game-btn" id="upgrade">⬆️ 업그레이드 50</button></div>`;$('sell').onclick=()=>{tycoon.cash+=10;setScore(tycoon.cash+(tycoon.level-1)*250);renderTycoonValues()};$('upgrade').onclick=()=>{if(tycoon.cash<50){$('status').textContent='코인 50개가 필요해요';return}tycoon.cash-=50;tycoon.level++;setScore(tycoon.cash+(tycoon.level-1)*250);renderTycoonValues()};$('status').textContent='자유 플레이'}
+function renderTycoonValues(){$('cash').textContent=tycoon.cash;$('level').textContent=tycoon.level}
+function showRanking(){alert('랭킹 TOP 8은 디자인 미리보기로 표시되어 있어요. 실제 방문자 전체의 공유 랭킹은 Firebase 같은 온라인 데이터베이스 연결이 필요합니다.')}
+function editName(){let n=prompt('랭킹에 사용할 아이디를 입력하세요:',saved.name||'');if(n&&n.trim()){saved.name=n.trim().slice(0,18);save();alert('아이디를 저장했어요: '+saved.name+'\\n현재 디자인에 표시된 랭킹을 실제 온라인 랭킹으로 바꾸려면 데이터베이스 연결이 필요해요.')} }
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeGame()});
+</script>
+</body></html>
